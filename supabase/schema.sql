@@ -81,6 +81,19 @@ CREATE TABLE IF NOT EXISTS public.reports (
     created_at timestamptz NOT NULL DEFAULT now()
 );
 
+ALTER TABLE IF EXISTS public.reports ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_policy WHERE polname = 'anon_select_reports') THEN
+        EXECUTE 'CREATE POLICY anon_select_reports ON public.reports FOR SELECT USING (auth.role() = ''anon'')';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_policy WHERE polname = 'anon_insert_reports') THEN
+        EXECUTE 'CREATE POLICY anon_insert_reports ON public.reports FOR INSERT WITH CHECK (auth.role() = ''anon'')';
+    END IF;
+END
+$$;
+
 CREATE TABLE IF NOT EXISTS public.employee_profiles (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     employee_id uuid UNIQUE REFERENCES public.employees(id) ON DELETE CASCADE,
