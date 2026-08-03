@@ -5101,6 +5101,92 @@ function cancelEditPerson(index) {
 
 async function loadAreaPeopleData() {
     try {
+        const remotePeople = await loadEmployeeDataFromSupabase();
+        if (remotePeople && typeof remotePeople === 'object') {
+            Object.entries(remotePeople).forEach(([area, people]) => {
+                if (!Array.isArray(people) || people.length === 0) return;
+                const expectedCount = AREA_PERSON_COUNTS[area] || people.length;
+                if (!Array.isArray(AREA_PEOPLE[area])) {
+                    AREA_PEOPLE[area] = [];
+                }
+                people.forEach(remote => {
+                    const index = Number.isFinite(remote.employee_index) ? remote.employee_index : AREA_PEOPLE[area].length;
+                    while (AREA_PEOPLE[area].length <= index) {
+                        const nextIndex = AREA_PEOPLE[area].length + 1;
+                        AREA_PEOPLE[area].push({
+                            nombre: `Colaborador ${nextIndex}`,
+                            dni: 'Pendiente',
+                            fechaIngreso: 'Pendiente',
+                            foto: AREA_PERSONS[area]?.foto || ''
+                        });
+                    }
+                    const existing = AREA_PEOPLE[area][index] || {};
+                    AREA_PEOPLE[area][index] = {
+                        ...existing,
+                        ...remote.profile_data,
+                        nombre: remote.employee_name || existing.nombre || `Colaborador ${index + 1}`,
+                        dni: remote.dni || existing.dni || 'Pendiente',
+                        fechaIngreso: remote.hire_date || existing.fechaIngreso || 'Pendiente',
+                        foto: remote.photo_url || existing.foto || AREA_PERSONS[area]?.foto || '',
+                        cargo: remote.job_title || remote.profile_data?.cargo || existing.cargo || '',
+                        supabaseEmployeeId: remote.employee_id || existing.supabaseEmployeeId || null,
+                        employee_key: remote.employee_key || existing.employee_key || ensurePersonEmployeeKey(area, index, existing)
+                    };
+                    ensurePersonEmployeeKey(area, index, AREA_PEOPLE[area][index]);
+                });
+                while (AREA_PEOPLE[area].length < expectedCount) {
+                    const index = AREA_PEOPLE[area].length + 1;
+                    AREA_PEOPLE[area].push({
+                        nombre: `Colaborador ${index}`,
+                        dni: 'Pendiente',
+                        fechaIngreso: 'Pendiente',
+                        foto: AREA_PERSONS[area]?.foto || ''
+                    });
+                }
+            });
+
+            const remoteAssets = await loadEquipmentDataFromSupabase();
+            const accessoriesByEquipment = new Map();
+            remoteAssets.accessories.forEach(accessory => {
+                const list = accessoriesByEquipment.get(accessory.equipment_id) || [];
+                list.push(accessory);
+                accessoriesByEquipment.set(accessory.equipment_id, list);
+            });
+
+            Object.values(AREA_PEOPLE).forEach(people => (people || []).forEach(person => {
+                const employeeId = String(person.supabaseEmployeeId || '');
+                if (!employeeId) return;
+                const employeeEquipment = remoteAssets.equipment.filter(item => String(item.employee_id || '') === employeeId);
+                if (!employeeEquipment.length) return;
+                person.equipmentProfiles = employeeEquipment.map((item, index) => {
+                    const accessoryRows = accessoriesByEquipment.get(item.id);
+                    const rawAccessories = Array.isArray(accessoryRows) && accessoryRows.length
+                        ? accessoryRows
+                        : (Array.isArray(item.accessories) ? item.accessories : []);
+                    return {
+                        supabaseEquipmentId: item.id,
+                        owner_employee_key: person.employee_key,
+                        name: item.equipment_name || `Equipo ${index + 1}`,
+                        brand: item.brand || '',
+                        model: item.model || '',
+                        serial: item.serial || '',
+                        status: item.status || 'Pendiente',
+                        hardware: item.hardware && typeof item.hardware === 'object' ? item.hardware : {},
+                        software: item.software && typeof item.software === 'object' ? item.software : {},
+                        action_taken: item.action_taken || '',
+                        accessoryList: rawAccessories.map((accessory, accessoryIndex) => ({
+                            id: accessory.id || `accessory-${item.id}-${accessoryIndex}`,
+                            name: accessory.name || '',
+                            model: accessory.model || '',
+                            serial: accessory.serial || '',
+                            owner_employee_key: person.employee_key
+                        }))
+                    };
+                });
+                person.supabaseEquipmentIds = person.equipmentProfiles.map(profile => profile.supabaseEquipmentId);
+            }));
+        }
+
         // Migrar las fichas guardadas por versiones anteriores, si existen.
         const saved = await readAreaPeopleData() || JSON.parse(localStorage.getItem('AREA_PEOPLE'));
         Object.entries(saved || {}).forEach(([area, people]) => {
