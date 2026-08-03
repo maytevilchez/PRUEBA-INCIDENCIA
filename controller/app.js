@@ -1404,11 +1404,124 @@ function renderReportes() {
     renderReportChart();
 }
 
-/* ─── SECCIÓN: PERSISTENCIA (localStorage del navegador) ───
+/* ─── SECCIÓN: PERSISTENCIA (localStorage + Supabase) ───
    saveInventoryToStorage()  → Guarda inventario editado para no perder cambios
-   loadInventoryFromStorage() → Recupera datos al recargar la página */
+   loadInventoryFromStorage() → Recupera datos al recargar la página y prioriza
+   el snapshot remoto si está disponible. */
 
-function loadInventoryFromStorage() {
+let inventoryRemoteSaveTimer = null;
+
+function applyInventorySnapshot(parsed) {
+    if (!window.APP_MODEL) {
+        window.APP_MODEL = {};
+    }
+    if (Array.isArray(parsed)) {
+        window.APP_MODEL.inventoryBySheet = { Principal: parsed };
+        window.APP_MODEL.activeInventorySheet = 'Principal';
+        window.APP_MODEL.excelFieldLabels = getDefaultExcelFieldLabels();
+        delete window.APP_MODEL.inventory;
+        window.APP_MODEL.hasImportedInventory = true;
+        return true;
+    }
+
+    if (parsed && typeof parsed === 'object' && Array.isArray(parsed.inventory) && !parsed.inventoryBySheet) {
+        window.APP_MODEL.inventoryBySheet = { Principal: parsed.inventory };
+        window.APP_MODEL.activeInventorySheet = 'Principal';
+        window.APP_MODEL.excelFieldLabels = getDefaultExcelFieldLabels();
+        delete window.APP_MODEL.inventory;
+        window.APP_MODEL.hasImportedInventory = true;
+        return true;
+    }
+
+    if (parsed && typeof parsed === 'object' && parsed.inventoryBySheet && typeof parsed.inventoryBySheet === 'object') {
+        window.APP_MODEL.inventoryBySheet = parsed.inventoryBySheet;
+        const keys = Object.keys(window.APP_MODEL.inventoryBySheet);
+        window.APP_MODEL.activeInventorySheet = (parsed.activeInventorySheet && window.APP_MODEL.inventoryBySheet[parsed.activeInventorySheet])
+            ? parsed.activeInventorySheet
+            : (keys[0] || 'Principal');
+        selectedAnalysisSheet = parsed.analysisSheetFilter || 'all';
+        window.APP_MODEL.excelFieldLabels = (parsed.excelFieldLabels && typeof parsed.excelFieldLabels === 'object')
+            ? Object.assign({}, getDefaultExcelFieldLabels(), parsed.excelFieldLabels)
+            : getDefaultExcelFieldLabels();
+        delete window.APP_MODEL.inventory;
+        window.APP_MODEL.hasImportedInventory = true;
+        return true;
+    }
+
+    ensureInventoryBySheetModel();
+    window.APP_MODEL.hasImportedInventory = false;
+    return false;
+}
+
+async function loadInventoryFromSupabase() {
+    if (!isSupabaseConfigured()) return null;
+    try {
+        const response = await supabaseRestFetch('reports?select=id,report_type,summary,payload,created_at&report_type=eq.inventory&order=created_at.desc&limit=1', {
+            method: 'GET'
+        });
+        if (!response.ok) {
+            console.warn('No se pudo cargar el inventario remoto desde Supabase:', response.status);
+            return null;
+        }
+        const rows = await response.json();
+        const row = Array.isArray(rows) && rows[0] ? rows[0] : null;
+        if (!row?.payload) return null;
+        const payload = typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload;
+        if (payload && typeof payload === 'object') {
+            applyInventorySnapshot(payload);
+            return payload;
+        }
+    } catch (error) {
+        console.warn('No se pudo cargar el snapshot de inventario desde Supabase.', error);
+    }
+    return null;
+}
+
+async function saveInventoryToSupabase() {
+    if (!isSupabaseConfigured() || !window.APP_MODEL) return false;
+    ensureInventoryBySheetModel();
+    try {
+        const payload = {
+            report_type: 'inventory',
+            summary: `Snapshot de inventario ${new Date().toLocaleString('es-PE')}`,
+            payload: {
+                inventoryBySheet: window.APP_MODEL.inventoryBySheet,
+                activeInventorySheet: window.APP_MODEL.activeInventorySheet,
+                excelFieldLabels: window.APP_MODEL.excelFieldLabels || getDefaultExcelFieldLabels(),
+                analysisSheetFilter: selectedAnalysisSheet || 'all'
+            }
+        };
+        const response = await supabaseRestFetch('reports', {
+            method: 'POST',
+            body: JSON.stringify([payload])
+        });
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`No se pudo guardar el inventario en Supabase: ${response.status} ${response.statusText} ${errText}`);
+        }
+        return true;
+    } catch (error) {
+        console.warn('No se pudo sincronizar el inventario con Supabase.', error);
+        return false;
+    }
+}
+
+function queueInventoryRemoteSync() {
+    if (!isSupabaseConfigured()) return;
+    if (inventoryRemoteSaveTimer) {
+        clearTimeout(inventoryRemoteSaveTimer);
+    }
+    inventoryRemoteSaveTimer = setTimeout(() => {
+        void saveInventoryToSupabase();
+    }, 800);
+}
+
+async function loadInventoryFromStorage() {
+    const remoteSnapshot = await loadInventoryFromSupabase();
+    if (remoteSnapshot) {
+        return true;
+    }
+
     const stored = localStorage.getItem('inventoryData');
     if (!stored) {
         ensureInventoryBySheetModel();
@@ -1416,42 +1529,12 @@ function loadInventoryFromStorage() {
             window.APP_MODEL = {};
         }
         window.APP_MODEL.hasImportedInventory = false;
-        return;
+        return false;
     }
 
     try {
         const parsed = JSON.parse(stored);
-        if (!window.APP_MODEL) {
-            window.APP_MODEL = {};
-        }
-        if (Array.isArray(parsed)) {
-            window.APP_MODEL.inventoryBySheet = { Principal: parsed };
-            window.APP_MODEL.activeInventorySheet = 'Principal';
-            window.APP_MODEL.excelFieldLabels = getDefaultExcelFieldLabels();
-            delete window.APP_MODEL.inventory;
-            window.APP_MODEL.hasImportedInventory = true;
-        } else if (parsed && typeof parsed === 'object' && Array.isArray(parsed.inventory) && !parsed.inventoryBySheet) {
-            window.APP_MODEL.inventoryBySheet = { Principal: parsed.inventory };
-            window.APP_MODEL.activeInventorySheet = 'Principal';
-            window.APP_MODEL.excelFieldLabels = getDefaultExcelFieldLabels();
-            delete window.APP_MODEL.inventory;
-            window.APP_MODEL.hasImportedInventory = true;
-        } else if (parsed && typeof parsed === 'object' && parsed.inventoryBySheet && typeof parsed.inventoryBySheet === 'object') {
-            window.APP_MODEL.inventoryBySheet = parsed.inventoryBySheet;
-            const keys = Object.keys(window.APP_MODEL.inventoryBySheet);
-            window.APP_MODEL.activeInventorySheet = (parsed.activeInventorySheet && window.APP_MODEL.inventoryBySheet[parsed.activeInventorySheet])
-                ? parsed.activeInventorySheet
-                : (keys[0] || 'Principal');
-            selectedAnalysisSheet = parsed.analysisSheetFilter || 'all';
-            window.APP_MODEL.excelFieldLabels = (parsed.excelFieldLabels && typeof parsed.excelFieldLabels === 'object')
-                ? Object.assign({}, getDefaultExcelFieldLabels(), parsed.excelFieldLabels)
-                : getDefaultExcelFieldLabels();
-            delete window.APP_MODEL.inventory;
-            window.APP_MODEL.hasImportedInventory = true;
-        } else {
-            ensureInventoryBySheetModel();
-            window.APP_MODEL.hasImportedInventory = false;
-        }
+        return applyInventorySnapshot(parsed);
     } catch (error) {
         console.warn('Error leyendo inventoryData desde localStorage', error);
         if (!window.APP_MODEL) {
@@ -1462,6 +1545,7 @@ function loadInventoryFromStorage() {
         window.APP_MODEL.excelFieldLabels = getDefaultExcelFieldLabels();
         delete window.APP_MODEL.inventory;
         window.APP_MODEL.hasImportedInventory = false;
+        return false;
     }
 }
 
@@ -1478,6 +1562,7 @@ function saveInventoryToStorage() {
             excelFieldLabels: window.APP_MODEL.excelFieldLabels || getDefaultExcelFieldLabels(),
             analysisSheetFilter: selectedAnalysisSheet || 'all'
         }));
+        queueInventoryRemoteSync();
     } catch (error) {
         console.warn('Error guardando inventoryData en localStorage', error);
     }
@@ -3388,6 +3473,38 @@ function isLocalFileProtocol() {
     return typeof window !== 'undefined' && window.location?.protocol === 'file:';
 }
 
+function isNetlifyHosted() {
+    if (typeof window === 'undefined' || !window.location?.hostname) return false;
+    const host = String(window.location.hostname).toLowerCase();
+    return host.includes('netlify') || host.includes('localhost') || host.includes('127.0.0.1');
+}
+
+function buildSupabaseRestUrl(path) {
+    const normalizedPath = String(path || '').replace(/^\/+/, '');
+    if (isNetlifyHosted() && !String(window.location?.hostname || '').includes('localhost') && !String(window.location?.hostname || '').includes('127.0.0.1')) {
+        const url = new URL('/.netlify/functions/supabase-proxy', window.location.origin);
+        url.searchParams.set('path', normalizedPath);
+        return url.toString();
+    }
+    const { url } = getSupabaseConfig();
+    return `${url}/rest/v1/${normalizedPath}`;
+}
+
+async function supabaseRestFetch(path, options = {}) {
+    const { key } = getSupabaseConfig();
+    const headers = new Headers(options.headers || {});
+    headers.set('Accept', 'application/json');
+    if (!headers.has('apikey')) headers.set('apikey', key);
+    if (!headers.has('Authorization')) headers.set('Authorization', `Bearer ${key}`);
+    if (!headers.has('Content-Type') && options.body && ['POST', 'PATCH', 'PUT', 'DELETE'].includes(String(options.method || 'GET').toUpperCase())) {
+        headers.set('Content-Type', 'application/json');
+    }
+    return fetch(buildSupabaseRestUrl(path), {
+        ...options,
+        headers
+    });
+}
+
 async function checkSupabaseConnection() {
     if (!isSupabaseConfigured()) {
         return { connected: false, reason: 'no-config' };
@@ -3395,19 +3512,13 @@ async function checkSupabaseConnection() {
     if (isLocalFileProtocol()) {
         return { connected: false, reason: 'local-file' };
     }
-    const { url, key } = getSupabaseConfig();
     const controller = new AbortController();
     // Los proyectos en reposo pueden tardar varios segundos en reactivar su API.
     const timeoutId = setTimeout(() => controller.abort(), 20000);
     try {
-        const response = await fetch(`${url}/rest/v1/employee_profiles?select=employee_key&limit=1`, {
+        const response = await supabaseRestFetch('employee_profiles?select=employee_key&limit=1', {
             method: 'GET',
-            signal: controller.signal,
-            headers: {
-                apikey: key,
-                Authorization: `Bearer ${key}`,
-                Accept: 'application/json'
-            }
+            signal: controller.signal
         });
         return { connected: response.ok, reason: response.ok ? 'ok' : `http ${response.status}` };
     } catch (error) {
@@ -3537,14 +3648,9 @@ async function saveEmployeeProfileToSupabase(areaName, index) {
     if (isLocalFileProtocol()) {
         throw new Error('No se puede conectar a Supabase desde file://. Abre la app desde un servidor local (por ejemplo Live Server o http://localhost).');
     }
-    const { url, key } = getSupabaseConfig();
-    const response = await fetch(`${url}/rest/v1/employee_profiles?on_conflict=employee_key`, {
+    const response = await supabaseRestFetch('employee_profiles?on_conflict=employee_key', {
         method: 'POST',
         headers: {
-            apikey: key,
-            Authorization: `Bearer ${key}`,
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
             Prefer: 'resolution=merge-duplicates'
         },
         body: JSON.stringify([record])
@@ -3562,16 +3668,11 @@ async function saveEmployeeProfileToSupabase(areaName, index) {
 
 async function saveEmployeeDataToSupabase(areaName = window.selectedArea) {
     if (!isSupabaseConfigured() || !areaName) return false;
-    const { url, key } = getSupabaseConfig();
     const records = buildEmployeeProfileRecords(areaName);
     if (!records.length) return false;
-    const response = await fetch(`${url}/rest/v1/employee_profiles?on_conflict=employee_key`, {
+    const response = await supabaseRestFetch('employee_profiles?on_conflict=employee_key', {
         method: 'POST',
         headers: {
-            apikey: key,
-            Authorization: `Bearer ${key}`,
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
             Prefer: 'resolution=merge-duplicates'
         },
         body: JSON.stringify(records)
@@ -3589,13 +3690,8 @@ async function saveEmployeeDataToSupabase(areaName = window.selectedArea) {
 
 async function loadEmployeeDataFromSupabase() {
     if (!isSupabaseConfigured()) return null;
-    const { url, key } = getSupabaseConfig();
-    const response = await fetch(`${url}/rest/v1/employee_profiles?select=employee_id,employee_key,employee_name,area,dni,hire_date,photo_url,employee_index,job_title,profile_data,updated_at`, {
-        headers: {
-            apikey: key,
-            Authorization: `Bearer ${key}`,
-            'Content-Type': 'application/json'
-        }
+    const response = await supabaseRestFetch('employee_profiles?select=employee_id,employee_key,employee_name,area,dni,hire_date,photo_url,employee_index,job_title,profile_data,updated_at', {
+        method: 'GET'
     });
     if (!response.ok) {
         throw new Error(`No se pudo cargar desde Supabase: ${response.status}`);
@@ -3627,11 +3723,9 @@ async function loadEmployeeDataFromSupabase() {
 
 async function loadEquipmentDataFromSupabase() {
     if (!isSupabaseConfigured()) return { equipment: [], accessories: [] };
-    const { url, key } = getSupabaseConfig();
-    const headers = { apikey: key, Authorization: `Bearer ${key}`, Accept: 'application/json' };
     const [equipmentResponse, accessoriesResponse] = await Promise.all([
-        fetch(`${url}/rest/v1/equipment?select=id,employee_id,employee_name,area_name,equipment_name,brand,model,serial,hardware,software,accessories,action_taken,status`, { headers }),
-        fetch(`${url}/rest/v1/equipment_accessories?select=id,equipment_id,employee_id,name,model,serial`, { headers })
+        supabaseRestFetch('equipment?select=id,employee_id,employee_name,area_name,equipment_name,brand,model,serial,hardware,software,accessories,action_taken,status', { method: 'GET' }),
+        supabaseRestFetch('equipment_accessories?select=id,equipment_id,employee_id,name,model,serial', { method: 'GET' })
     ]);
     if (!equipmentResponse.ok) throw new Error(`No se pudieron cargar los equipos desde Supabase: ${equipmentResponse.status}`);
     const equipment = await equipmentResponse.json();
@@ -4213,23 +4307,20 @@ async function saveEquipmentToSupabase(person) {
 
 async function deleteEquipmentFromSupabase(equipmentId) {
     if (!isSupabaseConfigured() || !equipmentId) return false;
-    const { url, key } = getSupabaseConfig();
     const headers = {
-        apikey: key,
-        Authorization: `Bearer ${key}`,
         Accept: 'application/json'
     };
     // Primero se eliminan los accesorios asociados (si la tabla existe por separado)
     // y luego el equipo, para no dejar registros huérfanos.
     try {
-        await fetch(`${url}/rest/v1/equipment_accessories?equipment_id=eq.${encodeURIComponent(equipmentId)}`, {
+        await supabaseRestFetch(`equipment_accessories?equipment_id=eq.${encodeURIComponent(equipmentId)}`, {
             method: 'DELETE',
             headers
         });
     } catch (e) {
         console.warn('No se pudieron eliminar accesorios asociados en Supabase.', e);
     }
-    const response = await fetch(`${url}/rest/v1/equipment?id=eq.${encodeURIComponent(equipmentId)}`, {
+    const response = await supabaseRestFetch(`equipment?id=eq.${encodeURIComponent(equipmentId)}`, {
         method: 'DELETE',
         headers
     });
@@ -4271,15 +4362,14 @@ async function saveEquipmentAccessories() {
 
 async function saveEquipmentAccessoriesToSupabase(equipmentId, person, accessories = []) {
     if (!isSupabaseConfigured() || !equipmentId) return false;
-    const { url, key } = getSupabaseConfig();
     const employeeName = String(person?.nombre || '').trim() || null;
     const employeeId = person?.supabaseEmployeeId || null;
     const areaName = String(window.selectedArea || person?.area || '').trim() || null;
     const areaId = areaName ? await getAreaIdByName(areaName) : null;
 
-    const deleteResponse = await fetch(`${url}/rest/v1/equipment_accessories?equipment_id=eq.${encodeURIComponent(equipmentId)}`, {
+    const deleteResponse = await supabaseRestFetch(`equipment_accessories?equipment_id=eq.${encodeURIComponent(equipmentId)}`, {
         method: 'DELETE',
-        headers: { apikey: key, Authorization: `Bearer ${key}`, Accept: 'application/json' }
+        headers: { Accept: 'application/json' }
     });
     if (!deleteResponse.ok) {
         const err = await deleteResponse.text();
@@ -4297,13 +4387,9 @@ async function saveEquipmentAccessoriesToSupabase(equipmentId, person, accessori
         model: String(accessory.model || '').trim() || null,
         serial: String(accessory.serial || '').trim() || null
     }));
-    const insertResponse = await fetch(`${url}/rest/v1/equipment_accessories`, {
+    const insertResponse = await supabaseRestFetch('equipment_accessories', {
         method: 'POST',
         headers: {
-            apikey: key,
-            Authorization: `Bearer ${key}`,
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
             Prefer: 'return=representation'
         },
         body: JSON.stringify(payload)
@@ -4317,13 +4403,8 @@ async function saveEquipmentAccessoriesToSupabase(equipmentId, person, accessori
 
 async function getAreaIdByName(areaName) {
     if (!isSupabaseConfigured() || !areaName) return null;
-    const { url, key } = getSupabaseConfig();
-    const response = await fetch(`${url}/rest/v1/areas?select=id&name=eq.${encodeURIComponent(areaName)}`, {
-        headers: {
-            apikey: key,
-            Authorization: `Bearer ${key}`,
-            Accept: 'application/json'
-        }
+    const response = await supabaseRestFetch(`areas?select=id&name=eq.${encodeURIComponent(areaName)}`, {
+        method: 'GET'
     });
     if (!response.ok) return null;
     const rows = await response.json();
@@ -4331,12 +4412,8 @@ async function getAreaIdByName(areaName) {
 
     // Compatibilidad con áreas registradas con tildes, por ejemplo
     // "Logística" en Supabase y "Logistica" en la interfaz.
-    const allResponse = await fetch(`${url}/rest/v1/areas?select=id,name`, {
-        headers: {
-            apikey: key,
-            Authorization: `Bearer ${key}`,
-            Accept: 'application/json'
-        }
+    const allResponse = await supabaseRestFetch('areas?select=id,name', {
+        method: 'GET'
     });
     if (!allResponse.ok) return null;
     const normalizeArea = value => String(value || '')
@@ -4350,13 +4427,8 @@ async function getAreaIdByName(areaName) {
 
 async function fetchEmployeeByDni(dni) {
     if (!isSupabaseConfigured() || !dni) return null;
-    const { url, key } = getSupabaseConfig();
-    const response = await fetch(`${url}/rest/v1/employees?select=id,dni&dni=eq.${encodeURIComponent(dni)}&limit=1`, {
-        headers: {
-            apikey: key,
-            Authorization: `Bearer ${key}`,
-            Accept: 'application/json'
-        }
+    const response = await supabaseRestFetch(`employees?select=id,dni&dni=eq.${encodeURIComponent(dni)}&limit=1`, {
+        method: 'GET'
     });
     if (!response.ok) return null;
     const rows = await response.json();
@@ -4370,13 +4442,8 @@ function hasUsableDni(dni) {
 
 async function fetchEmployeeByKey(employeeKey) {
     if (!isSupabaseConfigured() || !employeeKey) return null;
-    const { url, key } = getSupabaseConfig();
-    const response = await fetch(`${url}/rest/v1/employees?select=id,employee_key&employee_key=eq.${encodeURIComponent(employeeKey)}&limit=1`, {
-        headers: {
-            apikey: key,
-            Authorization: `Bearer ${key}`,
-            Accept: 'application/json'
-        }
+    const response = await supabaseRestFetch(`employees?select=id,employee_key&employee_key=eq.${encodeURIComponent(employeeKey)}&limit=1`, {
+        method: 'GET'
     });
     if (!response.ok) return null;
     const rows = await response.json();
@@ -4407,8 +4474,6 @@ async function upsertEmployeeToEmployees(person) {
         photo_url: photo,
         ...(areaId ? { area_id: areaId } : {})
     };
-    const { url, key } = getSupabaseConfig();
-
     let targetId = person.supabaseEmployeeId || null;
     if (!targetId) {
         const existing = await fetchEmployeeByKey(employeeKey);
@@ -4424,13 +4489,9 @@ async function upsertEmployeeToEmployees(person) {
     }
 
     if (targetId) {
-        const patchResponse = await fetch(`${url}/rest/v1/employees?id=eq.${encodeURIComponent(targetId)}`, {
+        const patchResponse = await supabaseRestFetch(`employees?id=eq.${encodeURIComponent(targetId)}`, {
             method: 'PATCH',
             headers: {
-                apikey: key,
-                Authorization: `Bearer ${key}`,
-                Accept: 'application/json',
-                'Content-Type': 'application/json',
                 Prefer: 'return=representation'
             },
             body: JSON.stringify(record)
@@ -4452,13 +4513,9 @@ async function upsertEmployeeToEmployees(person) {
         targetId = null;
     }
 
-    const insertResponse = await fetch(`${url}/rest/v1/employees`, {
+    const insertResponse = await supabaseRestFetch('employees', {
         method: 'POST',
         headers: {
-            apikey: key,
-            Authorization: `Bearer ${key}`,
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
             Prefer: 'return=representation'
         },
         body: JSON.stringify([record])
@@ -4734,14 +4791,9 @@ function mergeIncidentHistory(localIncidents, remoteIncidents, employeeName) {
 
 async function loadIncidentsFromSupabaseForEmployee(employeeId) {
     if (!employeeId || !isSupabaseConfigured()) return [];
-    const { url, key } = getSupabaseConfig();
     try {
-        const response = await fetch(`${url}/rest/v1/incidents?select=id,employee_id,title,description,severity,status,created_at&employee_id=eq.${encodeURIComponent(employeeId)}&order=created_at.desc`, {
-            headers: {
-                apikey: key,
-                Authorization: `Bearer ${key}`,
-                Accept: 'application/json'
-            }
+        const response = await supabaseRestFetch(`incidents?select=id,employee_id,title,description,severity,status,created_at&employee_id=eq.${encodeURIComponent(employeeId)}&order=created_at.desc`, {
+            method: 'GET'
         });
         if (!response.ok) {
             console.warn('No se pudieron cargar las incidencias remotas del empleado:', response.status);
@@ -4757,14 +4809,9 @@ async function loadIncidentsFromSupabaseForEmployee(employeeId) {
 
 async function loadAllIncidentsFromSupabase() {
     if (!isSupabaseConfigured()) return [];
-    const { url, key } = getSupabaseConfig();
     try {
-        const response = await fetch(`${url}/rest/v1/incidents?select=id,employee_id,title,description,severity,status,created_at,employees(full_name)`, {
-            headers: {
-                apikey: key,
-                Authorization: `Bearer ${key}`,
-                Accept: 'application/json'
-            }
+        const response = await supabaseRestFetch('incidents?select=id,employee_id,title,description,severity,status,created_at,employees(full_name)', {
+            method: 'GET'
         });
         if (!response.ok) {
             console.warn('No se pudieron cargar las incidencias remotas globales:', response.status);
@@ -5416,8 +5463,8 @@ function renderInventory() {
     renderReportes();
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    loadInventoryFromStorage();
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadInventoryFromStorage();
     initializeCharts();
     renderInventory();
     renderMetrics();
@@ -5427,6 +5474,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.addEventListener('beforeunload', () => {
         saveInventoryToStorage();
+        void saveInventoryToSupabase();
     });
 
     // Agregar funcionalidad de Enter en los campos de login
