@@ -393,12 +393,33 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- chart.js: gráficas de análisis predictivo y reportes -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-window.NAKAMA_SUPABASE_URL = 'https://isdczrwjtpugdwddtoiy.supabase.co';
-window.NAKAMA_SUPABASE_ANON_KEY = 'sb_publishable_onqjgNUN378oiObqIFvKEg_Y-Sb6XBP';
+    (async function loadSupabaseConfigAndApp(){
+        // Intenta obtener la URL y anon key desde la función server-side en Netlify
+        try {
+            const res = await fetch('/.netlify/functions/get-supabase-config');
+            if (!res.ok) throw new Error('config fetch failed');
+            const cfg = await res.json();
+            window.NAKAMA_SUPABASE_URL = String(cfg.url || '').trim();
+            window.NAKAMA_SUPABASE_ANON_KEY = String(cfg.anonKey || '').trim();
+        } catch (err) {
+            console.warn('No se pudo cargar la configuración de Supabase desde el servidor:', err);
+            // Mantener vacíos para que el código muestre estado "no configurado"
+            window.NAKAMA_SUPABASE_URL = '';
+            window.NAKAMA_SUPABASE_ANON_KEY = '';
+        }
+
+        // Cargar el resto de scripts que dependen de la configuración
+        const scripts = ['model/data.js', 'controller/app.js'];
+        for (const src of scripts) {
+            await new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = src;
+                s.onload = resolve;
+                s.onerror = () => reject(new Error('failed to load ' + src));
+                document.body.appendChild(s);
+            });
+        }
+    })();
 </script>
-<!-- model/data.js: datos iniciales del inventario -->
-<script src="model/data.js"></script>
-<!-- controller/app.js: toda la lógica (login, tablas, Excel, chat, IA) -->
-<script src="controller/app.js"></script>
 </body>
 </html>

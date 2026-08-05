@@ -1,3 +1,7 @@
 [build]
   publish = "."
   functions = "netlify/functions"
+
+[build.environment]
+  SUPABASE_URL = "https://isdczrwjtpugdwddtoiy.supabase.co"
+  SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlzZGN6cndqdHB1Z2R3ZGR0b2l5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1MDY0NjgsImV4cCI6MjEwMTA4MjQ2OH0.AU3RcR9-q4U27fHtaDrN-qqnPBnGqOWapAZxrgSzYYQ"
