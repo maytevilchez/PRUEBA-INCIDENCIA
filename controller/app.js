@@ -1100,20 +1100,14 @@ function getReportTableLabels() {
 function applyReportTableHeaderRow() {
     const theadRow = document.querySelector('#reportes-panel .report-table thead tr');
     if (!theadRow) return;
-    const L = getReportTableLabels();
-    theadRow.innerHTML = '';
-    ['empleado', 'equipo', 'descripcion'].forEach(key => {
-        const th = document.createElement('th');
-        th.textContent = L[key];
-        theadRow.appendChild(th);
-    });
+    const headers = ['N°', 'Incidente', 'Empleado', 'Creado por', 'Estado'];
+    theadRow.innerHTML = headers.map(text => `<th>${text}</th>`).join('');
 }
 
 function updateReportesSubtitle() {
     const el = document.getElementById('reportes-subtitle');
     if (!el) return;
-    const L = getReportTableLabels();
-    el.textContent = 'Encabezados alineados con el Excel: ' + L.empleado + ', ' + L.equipo + ', ' + L.descripcion + '.';
+    el.textContent = 'Columnas visibles del reporte: N°, Incidente, Empleado, Creado por, Estado.';
 }
 
 function pickReporteProblemaText(row, canon) {
@@ -1316,15 +1310,23 @@ function exportReportesExcel() {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Reporte');
 
-    const headerCells = Array.from(document.querySelectorAll('#reportes-main-table thead th')).map(cell => cell.textContent.trim());
-    if (!headerCells.length) {
-        headerCells.push('Empleado', 'Equipo', 'Descripción del problema');
-    }
+    const headerCells = ['N°', 'Incidente', 'Empleado', 'Creado por', 'Estado'];
 
-    const rows = reportes.map(item => [
+    const extractCreatedBy = text => {
+        if (!text) return '';
+        const raw = String(text).trim();
+        const match = raw.match(/Creado por:\s*(.+)$/i);
+        if (match) return match[1].trim();
+        if (/^Creado por\b/i.test(raw)) return raw.replace(/^Creado por:\s*/i, '').trim();
+        return '';
+    };
+
+    const rows = reportes.map((item, index) => [
+        index + 1,
+        item.problema || '',
         item.empleado || 'N/A',
-        item.producto || '',
-        item.problema || ''
+        extractCreatedBy(item.producto),
+        item.estado || ''
     ]);
 
     worksheet.addTable({
@@ -1342,19 +1344,31 @@ function exportReportesExcel() {
         rows: rows
     });
 
-    worksheet.eachRow({ includeEmpty: true }, row => {
-        row.eachCell(cell => {
-            cell.border = {
-                top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-                left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-                bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-                right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
-            };
-            cell.alignment = { vertical: 'top', wrapText: true };
-        });
-    });
+    const borderStyle = {
+        style: 'thin',
+        color: { argb: 'FFCBD5E1' }
+    };
+    const numRows = rows.length + 1;
+    const numCols = headerCells.length;
 
-    worksheet.columns.forEach((column) => {
+    for (let rowIndex = 1; rowIndex <= numRows; rowIndex += 1) {
+        const row = worksheet.getRow(rowIndex);
+        row.eachCell({ includeEmpty: true }, cell => {
+            if (cell.col > numCols) return;
+            cell.border = {
+                top: borderStyle,
+                left: borderStyle,
+                bottom: borderStyle,
+                right: borderStyle
+            };
+            cell.alignment = { vertical: 'middle', wrapText: true };
+            if (rowIndex === 1) {
+                cell.font = { bold: true };
+            }
+        });
+    }
+
+    worksheet.columns.forEach((column, index) => {
         let maxLength = 0;
         column.eachCell({ includeEmpty: true }, cell => {
             const value = cell.value == null ? '' : String(cell.value);
@@ -1390,15 +1404,24 @@ function renderReportes() {
 
     const reportes = getFilteredReportes();
     if (!reportes.length) {
-        tbody.innerHTML = '<tr><td colspan="3" class="report-empty-row">No hay incidencias con texto en columnas de problema, síntomas, causa o asunto. Revisa el mapeo del Excel o el filtro de mes.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="report-empty-row">No hay incidencias con texto en columnas de problema, síntomas, causa o asunto. Revisa el mapeo del Excel o el filtro de mes.</td></tr>';
         renderReportChart();
         return;
     }
-    tbody.innerHTML = reportes.map(item => `
+    const extractCreatedBy = text => {
+        if (!text) return '';
+        const raw = String(text).trim();
+        const match = raw.match(/Creado por:\s*(.+)$/i);
+        return match ? match[1].trim() : '';
+    };
+
+    tbody.innerHTML = reportes.map((item, index) => `
         <tr>
-            <td>${escapeHtml(item.empleado || 'N/A')}</td>
-            <td>${escapeHtml(String(item.producto || ''))}</td>
+            <td>${index + 1}</td>
             <td>${escapeHtml(String(item.problema || ''))}</td>
+            <td>${escapeHtml(item.empleado || 'N/A')}</td>
+            <td>${escapeHtml(extractCreatedBy(item.producto))}</td>
+            <td>${escapeHtml(item.estado || '')}</td>
         </tr>
     `).join('');
     renderReportChart();
@@ -4741,6 +4764,25 @@ function saveEmployeeIncidents(employeeName, incidents) {
     }
 }
 
+function clearAllIncidents() {
+    if (!confirm('¿Eliminar todas las incidencias locales y limpiar el reporte?')) return;
+    try {
+        const keys = Object.keys(localStorage || {});
+        keys.forEach(key => {
+            if (typeof key === 'string' && key.startsWith('incidents_by_employee_')) {
+                localStorage.removeItem(key);
+            }
+        });
+    } catch (error) {
+        console.warn('No se pudieron borrar las incidencias locales.', error);
+    }
+    if (window.APP_MODEL) {
+        delete window.APP_MODEL.reportes;
+    }
+    renderReportes();
+    alert('Todas las incidencias locales han sido borradas.');
+}
+
 function getAllLocalEmployeeIncidents() {
     const incidents = [];
     try {
@@ -5101,6 +5143,31 @@ function cancelEditPerson(index) {
 
 async function loadAreaPeopleData() {
     try {
+        // Migrar las fichas guardadas por versiones anteriores, si existen.
+        const saved = await readAreaPeopleData() || JSON.parse(localStorage.getItem('AREA_PEOPLE'));
+        Object.entries(saved || {}).forEach(([area, people]) => {
+            const expectedCount = AREA_PERSON_COUNTS[area] || 0;
+            if (Array.isArray(people) && people.length > 0 && expectedCount > 0) {
+                AREA_PEOPLE[area] = people.slice(0, expectedCount);
+                while (AREA_PEOPLE[area].length < expectedCount) {
+                    const index = AREA_PEOPLE[area].length + 1;
+                    AREA_PEOPLE[area].push({
+                        nombre: `Colaborador ${index}`,
+                        dni: 'Pendiente',
+                        fechaIngreso: 'Pendiente',
+                        foto: AREA_PERSONS[area].foto
+                    });
+                }
+            }
+        });
+        if (AREA_PEOPLE.TI?.[0]) {
+            AREA_PEOPLE.TI[0].cargo = 'Gerente de TI';
+            AREA_PEOPLE.TI[0].fechaIngreso = '';
+        }
+        if (AREA_PEOPLE.Logistica?.[1]) {
+            AREA_PEOPLE.Logistica[1].cargo = 'Jefe de Logística';
+        }
+
         const remotePeople = await loadEmployeeDataFromSupabase();
         if (remotePeople && typeof remotePeople === 'object') {
             Object.entries(remotePeople).forEach(([area, people]) => {
@@ -5147,127 +5214,20 @@ async function loadAreaPeopleData() {
 
             const remoteAssets = await loadEquipmentDataFromSupabase();
             const accessoriesByEquipment = new Map();
-            remoteAssets.accessories.forEach(accessory => {
-                const list = accessoriesByEquipment.get(accessory.equipment_id) || [];
-                list.push(accessory);
-                accessoriesByEquipment.set(accessory.equipment_id, list);
-            });
-
-            Object.values(AREA_PEOPLE).forEach(people => (people || []).forEach(person => {
-                const employeeId = String(person.supabaseEmployeeId || '');
-                if (!employeeId) return;
-                const employeeEquipment = remoteAssets.equipment.filter(item => String(item.employee_id || '') === employeeId);
-                if (!employeeEquipment.length) return;
-                person.equipmentProfiles = employeeEquipment.map((item, index) => {
-                    const accessoryRows = accessoriesByEquipment.get(item.id);
-                    const rawAccessories = Array.isArray(accessoryRows) && accessoryRows.length
-                        ? accessoryRows
-                        : (Array.isArray(item.accessories) ? item.accessories : []);
-                    return {
-                        supabaseEquipmentId: item.id,
-                        owner_employee_key: person.employee_key,
-                        name: item.equipment_name || `Equipo ${index + 1}`,
-                        brand: item.brand || '',
-                        model: item.model || '',
-                        serial: item.serial || '',
-                        status: item.status || 'Pendiente',
-                        hardware: item.hardware && typeof item.hardware === 'object' ? item.hardware : {},
-                        software: item.software && typeof item.software === 'object' ? item.software : {},
-                        action_taken: item.action_taken || '',
-                        accessoryList: rawAccessories.map((accessory, accessoryIndex) => ({
-                            id: accessory.id || `accessory-${item.id}-${accessoryIndex}`,
-                            name: accessory.name || '',
-                            model: accessory.model || '',
-                            serial: accessory.serial || '',
-                            owner_employee_key: person.employee_key
-                        }))
-                    };
+            if (Array.isArray(remoteAssets?.accessories)) {
+                remoteAssets.accessories.forEach(accessory => {
+                    const list = accessoriesByEquipment.get(accessory.equipment_id) || [];
+                    list.push(accessory);
+                    accessoriesByEquipment.set(accessory.equipment_id, list);
                 });
-                person.supabaseEquipmentIds = person.equipmentProfiles.map(profile => profile.supabaseEquipmentId);
-            }));
-        }
-
-        // Migrar las fichas guardadas por versiones anteriores, si existen.
-        const saved = await readAreaPeopleData() || JSON.parse(localStorage.getItem('AREA_PEOPLE'));
-        Object.entries(saved || {}).forEach(([area, people]) => {
-            const expectedCount = AREA_PERSON_COUNTS[area] || 0;
-            if (Array.isArray(people) && people.length > 0 && expectedCount > 0) {
-                AREA_PEOPLE[area] = people.slice(0, expectedCount);
-                while (AREA_PEOPLE[area].length < expectedCount) {
-                    const index = AREA_PEOPLE[area].length + 1;
-                    AREA_PEOPLE[area].push({
-                        nombre: `Colaborador ${index}`,
-                        dni: 'Pendiente',
-                        fechaIngreso: 'Pendiente',
-                        foto: AREA_PERSONS[area].foto
-                    });
-                }
             }
-        });
-        if (AREA_PEOPLE.TI?.[0]) {
-            AREA_PEOPLE.TI[0].cargo = 'Gerente de TI';
-            AREA_PEOPLE.TI[0].fechaIngreso = '';
-        }
-        if (AREA_PEOPLE.Logistica?.[1]) {
-            AREA_PEOPLE.Logistica[1].cargo = 'Jefe de Logística';
-        }
-
-        const remotePeople = await loadEmployeeDataFromSupabase();
-        if (remotePeople) {
-            Object.entries(remotePeople).forEach(([area, people]) => {
-                if (!Array.isArray(people) || people.length === 0) return;
-                const expectedCount = AREA_PERSON_COUNTS[area] || people.length;
-                if (!Array.isArray(AREA_PEOPLE[area])) {
-                    AREA_PEOPLE[area] = [];
-                }
-                people.forEach(remote => {
-                    const index = Number.isFinite(remote.employee_index) ? remote.employee_index : AREA_PEOPLE[area].length;
-                    while (AREA_PEOPLE[area].length <= index) {
-                        const nextIndex = AREA_PEOPLE[area].length + 1;
-                        AREA_PEOPLE[area].push({
-                            nombre: `Colaborador ${nextIndex}`,
-                            dni: 'Pendiente',
-                            fechaIngreso: 'Pendiente',
-                            foto: AREA_PERSONS[area]?.foto || ''
-                        });
-                    }
-                    const existing = AREA_PEOPLE[area][index] || {};
-                    AREA_PEOPLE[area][index] = {
-                        ...existing,
-                        ...remote.profile_data,
-                        nombre: remote.employee_name || existing.nombre || `Colaborador ${index + 1}`,
-                        dni: remote.dni || existing.dni || 'Pendiente',
-                        fechaIngreso: remote.hire_date || existing.fechaIngreso || 'Pendiente',
-                        foto: remote.photo_url || existing.foto || AREA_PERSONS[area]?.foto || '',
-                        cargo: remote.job_title || remote.profile_data?.cargo || existing.cargo || '',
-                        supabaseEmployeeId: remote.employee_id || existing.supabaseEmployeeId || null,
-                        employee_key: remote.employee_key || existing.employee_key || ensurePersonEmployeeKey(area, index, existing)
-                    };
-                    ensurePersonEmployeeKey(area, index, AREA_PEOPLE[area][index]);
-                });
-                while (AREA_PEOPLE[area].length < expectedCount) {
-                    const index = AREA_PEOPLE[area].length + 1;
-                    AREA_PEOPLE[area].push({
-                        nombre: `Colaborador ${index}`,
-                        dni: 'Pendiente',
-                        fechaIngreso: 'Pendiente',
-                        foto: AREA_PERSONS[area]?.foto || ''
-                    });
-                }
-            });
-
-            const remoteAssets = await loadEquipmentDataFromSupabase();
-            const accessoriesByEquipment = new Map();
-            remoteAssets.accessories.forEach(accessory => {
-                const list = accessoriesByEquipment.get(accessory.equipment_id) || [];
-                list.push(accessory);
-                accessoriesByEquipment.set(accessory.equipment_id, list);
-            });
 
             Object.values(AREA_PEOPLE).forEach(people => (people || []).forEach(person => {
                 const employeeId = String(person.supabaseEmployeeId || '');
                 if (!employeeId) return;
-                const employeeEquipment = remoteAssets.equipment.filter(item => String(item.employee_id || '') === employeeId);
+                const employeeEquipment = Array.isArray(remoteAssets?.equipment)
+                    ? remoteAssets.equipment.filter(item => String(item.employee_id || '') === employeeId)
+                    : [];
                 if (!employeeEquipment.length) return;
                 person.equipmentProfiles = employeeEquipment.map((item, index) => {
                     const accessoryRows = accessoriesByEquipment.get(item.id);
