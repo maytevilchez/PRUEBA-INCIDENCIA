@@ -1,0 +1,11 @@
+{
+  "dependencies": {
+    "@supabase/supabase-js": "^2.112.0",
+    "@netlify/database": "^1.0.0",
+    "drizzle-orm": "^0.27.0",
+    "pg": "^8.11.0"
+  },
+  "devDependencies": {
+    "netlify-cli": "^27.1.0"
+  }
+}
