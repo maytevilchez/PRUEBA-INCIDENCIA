@@ -27,20 +27,43 @@ exports.handler = async function handler(event) {
     };
   }
 
-  const targetUrl = `${SUPABASE_URL}/rest/v1/${path}`;
+  // Construir URL objetivo para la REST API de Supabase
+  const targetUrl = `${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/${path}`;
+
+  // Priorizar cualquier cabecera de autenticación que venga del cliente (apikey / Authorization).
+  // Si no vienen, usar la anon key del entorno.
+  const incomingHeaders = event.headers || {};
   const upstreamHeaders = {
-    Accept: 'application/json',
-    apikey: SUPABASE_ANON_KEY,
-    Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+    Accept: 'application/json'
   };
 
-  const incomingHeaders = event.headers || {};
+  // Copiar content-type/accept/prefer si vienen
   for (const [key, value] of Object.entries(incomingHeaders)) {
     const lowerKey = key.toLowerCase();
-    if (lowerKey === 'content-type' || lowerKey === 'accept' || lowerKey === 'prefer' || lowerKey === 'apikey' || lowerKey === 'authorization') {
+    if (lowerKey === 'content-type' || lowerKey === 'accept' || lowerKey === 'prefer') {
       upstreamHeaders[key] = value;
     }
   }
+
+  // Autenticación: si el cliente envía apikey/authorization, úsalas; si no, aplica la anon key del entorno
+  if (incomingHeaders.apikey || incomingHeaders['apikey']) {
+    upstreamHeaders.apikey = incomingHeaders.apikey || incomingHeaders['apikey'];
+  } else if (incomingHeaders['ApiKey'] || incomingHeaders['APIKEY']) {
+    upstreamHeaders.apikey = incomingHeaders['ApiKey'] || incomingHeaders['APIKEY'];
+  } else {
+    upstreamHeaders.apikey = SUPABASE_ANON_KEY;
+  }
+
+  if (incomingHeaders.authorization || incomingHeaders.Authorization) {
+    upstreamHeaders.Authorization = incomingHeaders.authorization || incomingHeaders.Authorization;
+  } else {
+    upstreamHeaders.Authorization = `Bearer ${SUPABASE_ANON_KEY}`;
+  }
+
+  // Log útil para depuración (no incluye keys completas)
+  try {
+    console.log('Supabase proxy request', { method: event.httpMethod, path, targetUrl, hasAuth: Boolean(upstreamHeaders.Authorization) });
+  } catch (e) {}
 
   const method = event.httpMethod || 'GET';
   const body = method === 'GET' || method === 'HEAD' ? undefined : event.body;
@@ -69,6 +92,7 @@ exports.handler = async function handler(event) {
       body: typeof parsedBody === 'string' ? parsedBody : JSON.stringify(parsedBody)
     };
   } catch (error) {
+    console.error('Supabase proxy error:', String(error?.message || error));
     return {
       statusCode: 502,
       headers,
