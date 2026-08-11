@@ -5509,7 +5509,12 @@ function renderInventory() {
     renderReportes();
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
+let appInitialized = false;
+
+async function initializeApp() {
+    if (appInitialized) return;
+    appInitialized = true;
+
     await loadInventoryFromStorage();
     initializeCharts();
     renderInventory();
@@ -5517,6 +5522,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderAnalysis();
     renderAlerts();
     renderReportes();
+    await updateSupabaseStatusIndicator();
 
     window.addEventListener('beforeunload', () => {
         saveInventoryToStorage();
@@ -5524,17 +5530,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // Agregar funcionalidad de Enter en los campos de login
-    document.getElementById("usuario").addEventListener("keypress", function(event) {
-        if (event.key === "Enter") {
-            login();
-        }
-    });
-
-    document.getElementById("password").addEventListener("keypress", function(event) {
-        if (event.key === "Enter") {
-            login();
-        }
-    });
+    const userInput = document.getElementById("usuario");
+    const passwordInput = document.getElementById("password");
+    if (userInput) {
+        userInput.addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                login();
+            }
+        });
+    }
+    if (passwordInput) {
+        passwordInput.addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                login();
+            }
+        });
+    }
 
     // Evento para redimensionar gráficos en responsive
     window.addEventListener('resize', () => {
@@ -5542,4 +5553,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (analysisTypeChart) analysisTypeChart.resize();
         if (reportChart) reportChart.resize();
     });
-});
+}
+
+document.addEventListener('DOMContentLoaded', initializeApp);
+if (document.readyState !== 'loading') {
+    void initializeApp();
+}
