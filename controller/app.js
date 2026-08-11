@@ -5237,9 +5237,25 @@ function cancelEditPerson(index) {
 }
 
 async function loadAreaPeopleData() {
+    let saved = null;
+    // La copia local es opcional. En algunos navegadores/PCs IndexedDB puede
+    // estar deshabilitado; eso no debe impedir cargar los datos de Supabase.
+    try {
+        saved = await readAreaPeopleData();
+    } catch (error) {
+        console.warn('No se pudo leer la copia local de colaboradores.', error);
+    }
+    if (!saved) {
+        try {
+            const localPeople = localStorage.getItem('AREA_PEOPLE');
+            saved = localPeople ? JSON.parse(localPeople) : null;
+        } catch (error) {
+            console.warn('La copia local de colaboradores no es válida; se usará Supabase.', error);
+        }
+    }
+
     try {
         // Migrar las fichas guardadas por versiones anteriores, si existen.
-        const saved = await readAreaPeopleData() || JSON.parse(localStorage.getItem('AREA_PEOPLE'));
         Object.entries(saved || {}).forEach(([area, people]) => {
             const expectedCount = AREA_PERSON_COUNTS[area] || 0;
             if (Array.isArray(people) && people.length > 0 && expectedCount > 0) {
