@@ -215,36 +215,46 @@ function sendChatMessage() {
 }
 
 function formatChatDate(value) {
-    if (!value) return '';
-    const raw = String(value).trim();
-    const parsed = new Date(raw);
-    if (!Number.isNaN(parsed.getTime()) && /\d{4}/.test(raw)) {
-        return parsed.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
-    }
-    return raw;
-}
+    if (!container) return;
 
-function findEmployeeInQuestion(q, rows, getEmployeeTextFn) {
-    const employees = [...new Set(rows.map(r => getEmployeeTextFn(r)).filter(Boolean))];
-    const qNorm = String(q).toLowerCase();
+    container.innerHTML = people.map((person, index) => {
+        const isTiManager = areaName === 'TI' && index === 0;
+        const dateView = isTiManager ? '' : `<div class="person-field"><label>Fecha de Ingreso:</label><p>${escapePersonText(person.fechaIngreso)}</p></div>`;
+        const dateEdit = isTiManager ? '' : `<div class="person-field"><label>Fecha de Ingreso:</label><input type="date" class="edit-input edit-date" value="${dateToInputValue(person.fechaIngreso)}"></div>`;
+        // Acciones: cuando el usuario puede editar, mostramos guardar/cancelar por defecto
+        const actionsHtml = editable
+            ? `<div class="person-card-actions">
+                    <button class="person-edit-btn hidden" onclick="startEditPerson(${index})">Editar</button>
+                    <button class="person-save-btn" onclick="savePerson(${index})">Guardar</button>
+                    <button class="person-cancel-btn" onclick="cancelEditPerson(${index})">Cancelar</button>
+               </div>`
+            : `<div class="person-card-actions">
+                    <button class="person-edit-btn" onclick="startEditPerson(${index})">Editar</button>
+                    <button class="person-save-btn hidden" onclick="savePerson(${index})">Guardar</button>
+                    <button class="person-cancel-btn hidden" onclick="cancelEditPerson(${index})">Cancelar</button>
+               </div>`;
 
-    for (const emp of employees) {
-        if (qNorm.includes(emp.toLowerCase())) return emp;
-    }
-
-    const qWords = qNorm.split(/[^a-záéíóúñü0-9]+/i).filter(w => w.length > 2);
-    let best = null;
-    let bestScore = 0;
-
-    employees.forEach(emp => {
-        const parts = emp.toLowerCase().split(/\s+/).filter(p => p.length > 2);
-        const score = parts.filter(p => qWords.some(w => p.includes(w) || w.includes(p) || p.startsWith(w.slice(0, 4)))).length;
-        if (score > bestScore) {
-            bestScore = score;
-            best = emp;
-        }
-    });
-
+        return `
+        <article class="person-card" data-person-index="${index}">
+            ${actionsHtml}
+            <div class="person-photo"><img src="${escapePersonText(person.foto)}" alt="Foto de ${escapePersonText(person.nombre)}" style="object-position: ${photoPosition(person.fotoPosX)}% ${photoPosition(person.fotoPosY)}%"></div>
+            <h2 class="person-name">${escapePersonText(person.nombre)}</h2>
+            <p class="person-role">${escapePersonText(person.cargo || areaName)}</p>
+            <div class="person-info person-view-mode ${editable ? 'hidden' : ''}">
+                <div class="person-field"><label>DNI:</label><p>${escapePersonText(person.dni)}</p></div>
+                ${dateView}
+            </div>
+            <div class="person-info person-edit-mode ${editable ? '' : 'hidden'}">
+                <div class="person-field"><label>Nombre:</label><input type="text" class="edit-input edit-name" value="${escapePersonText(person.nombre)}"></div>
+                <div class="person-field"><label>Cargo:</label><input type="text" class="edit-input edit-cargo" value="${escapePersonText(person.cargo || areaName)}"></div>
+                <div class="person-field"><label>DNI:</label><input type="text" class="edit-input edit-dni" value="${person.dni === 'Pendiente' ? '' : escapePersonText(person.dni)}"></div>
+                <div class="person-field"><label>Foto (archivo):</label><input type="file" class="edit-input edit-photo" accept="image/*"></div>
+                <div class="person-field"><label>Foto (URL):</label><input type="url" class="edit-input edit-photo-url" placeholder="https://..." value="${escapePersonText(person.foto && person.foto.startsWith('data:') ? '' : person.foto)}"></div>
+                ${dateEdit}
+            </div>
+            <button type="button" class="person-enter-btn" onclick="openEquipmentProfile(${index})">Ingresar</button>
+        </article>`;
+    }).join('');
     return bestScore > 0 ? best : null;
 }
 
@@ -3528,10 +3538,37 @@ function backToAreas() {
 }
 
 // Personas mostradas en cada area. El numero de tarjetas coincide con el numero del area.
-const AREA_PERSON_COUNTS = {
+const DEFAULT_AREA_PERSON_COUNTS = {
     Contabilidad: 1, Ingenieria: 6, Logistica: 2, Marketing: 1, Ofertas: 3,
     Operaciones: 7, Planificacion: 1, SAS: 5, SSOMA: 1, TI: 4
 };
+
+// LocalStorage key for persisted counts per area
+const AREA_PERSON_COUNTS_STORAGE_KEY = 'AREA_PERSON_COUNTS';
+
+// Load saved counts from localStorage if present, otherwise use defaults
+function loadAreaPersonCountsFromStorage() {
+    try {
+        const raw = localStorage.getItem(AREA_PERSON_COUNTS_STORAGE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (typeof parsed !== 'object' || parsed === null) return null;
+        return Object.assign({}, DEFAULT_AREA_PERSON_COUNTS, parsed);
+    } catch (err) {
+        console.warn('No se pudo leer AREA_PERSON_COUNTS desde localStorage:', err);
+        return null;
+    }
+}
+
+function saveAreaPersonCountsToStorage() {
+    try {
+        localStorage.setItem(AREA_PERSON_COUNTS_STORAGE_KEY, JSON.stringify(AREA_PERSON_COUNTS || DEFAULT_AREA_PERSON_COUNTS));
+    } catch (err) {
+        console.warn('No se pudo guardar AREA_PERSON_COUNTS en localStorage:', err);
+    }
+}
+
+let AREA_PERSON_COUNTS = loadAreaPersonCountsFromStorage() || Object.assign({}, DEFAULT_AREA_PERSON_COUNTS);
 
 /* Las fotos no se guardan en localStorage porque su límite es muy reducido.
    IndexedDB permanece disponible después de cerrar el navegador y admite
@@ -3798,6 +3835,28 @@ async function saveEmployeeDataToSupabase(areaName = window.selectedArea) {
     return true;
 }
 
+// Sincroniza todos los colaboradores de un área con Supabase (empleados + perfiles)
+async function syncAreaToSupabase(areaName = window.selectedArea) {
+    if (!isSupabaseConfigured() || !areaName) {
+        console.warn('Supabase no configurado o área inválida; no se sincroniza.');
+        return false;
+    }
+    const people = Array.isArray(AREA_PEOPLE[areaName]) ? AREA_PEOPLE[areaName] : [];
+    for (let i = 0; i < people.length; i += 1) {
+        const person = people[i];
+        try {
+            // Asegurar registro en tabla `employees` y luego en `employee_profiles`
+            await upsertEmployeeToEmployees(person);
+            await saveEmployeeProfileToSupabase(areaName, i);
+        } catch (err) {
+            console.warn(`No se pudo sincronizar colaborador ${person?.nombre || i} en área ${areaName}:`, err?.message || err);
+            // continuar con el siguiente para no abortar toda la sincronización
+        }
+    }
+    await updateSupabaseStatusIndicator();
+    return true;
+}
+
 async function loadEmployeeDataFromSupabase() {
     if (!isSupabaseConfigured()) return null;
     const response = await supabaseRestFetch('employee_profiles?select=employee_id,employee_key,employee_name,area,dni,hire_date,photo_url,employee_index,job_title,profile_data,updated_at', {
@@ -3914,10 +3973,23 @@ async function saveAreaPeopleData() {
             try {
                 backupAreaPeopleToLocalStorage();
                 backupEmployeeAccessoriesToLocalStorage();
+                    // Persist the current counts per área junto con los datos de personas
+                    try { saveAreaPersonCountsToStorage(); } catch (err) { console.warn('Error guardando AREA_PERSON_COUNTS tras saveAreaPeopleData:', err); }
             } catch (error) {
                 console.warn('No se pudo crear el respaldo local tras guardar en IndexedDB:', error);
             }
             resolve();
+            // Intentar sincronizar el área actualmente seleccionada con Supabase en background
+            (async () => {
+                try {
+                    if (isSupabaseConfigured() && window.selectedArea) {
+                        await syncAreaToSupabase(window.selectedArea);
+                        console.info('Sincronización automática con Supabase completada para el área', window.selectedArea);
+                    }
+                } catch (err) {
+                    console.warn('Sincronización automática con Supabase falló:', err?.message || err);
+                }
+            })();
         };
         transaction.onerror = () => {
             db.close();
@@ -3975,6 +4047,37 @@ function applyModelPersonnelDefaults() {
 }
 
 applyModelPersonnelDefaults();
+
+// Reconciliar seeds del modelo (model/data.js) con AREA_PEOPLE
+// Copia valores de `window.APP_MODEL.personnelByArea` sobre los placeholders
+// sin sobrescribir datos reales que el usuario ya haya editado.
+function reconcileModelSeeds() {
+    try {
+        const modelPeople = window.APP_MODEL?.personnelByArea || {};
+        Object.entries(modelPeople).forEach(([area, people]) => {
+            if (!Array.isArray(people) || !people.length) return;
+            if (!Array.isArray(AREA_PEOPLE[area])) return;
+            people.forEach((seed, index) => {
+                if (!seed) return;
+                const current = AREA_PEOPLE[area][index];
+                // No sobrescribir si el usuario ya puso un nombre distinto
+                const isPlaceholder = !current || /colaborador|pendiente/i.test(String(current.nombre || ''));
+                if (isPlaceholder) {
+                    AREA_PEOPLE[area][index] = {
+                        ...current,
+                        ...seed,
+                        foto: seed.foto || current?.foto || ''
+                    };
+                    ensurePersonEmployeeKey(area, index, AREA_PEOPLE[area][index]);
+                }
+            });
+        });
+    } catch (err) {
+        console.warn('Error reconciliando seeds del modelo:', err);
+    }
+}
+
+reconcileModelSeeds();
 
 function escapePersonText(value) {
     return String(value ?? '').replace(/[&<>'"]/g, character => ({
@@ -4131,7 +4234,8 @@ function renderAreaPeople(areaName) {
                 <div class="person-field"><label>Nombre:</label><input type="text" class="edit-input edit-name" value="${escapePersonText(person.nombre)}"></div>
                 <div class="person-field"><label>Cargo:</label><input type="text" class="edit-input edit-cargo" value="${escapePersonText(person.cargo || areaName)}"></div>
                 <div class="person-field"><label>DNI:</label><input type="text" class="edit-input edit-dni" value="${person.dni === 'Pendiente' ? '' : escapePersonText(person.dni)}"></div>
-                <div class="person-field"><label>Foto:</label><input type="file" class="edit-input edit-photo" accept="image/*"></div>
+                <div class="person-field"><label>Foto (archivo):</label><input type="file" class="edit-input edit-photo" accept="image/*"></div>
+                <div class="person-field"><label>Foto (URL):</label><input type="url" class="edit-input edit-photo-url" placeholder="https://..." value="${escapePersonText(person.foto && person.foto.startsWith('data:') ? '' : person.foto)}"></div>
                 ${dateEdit}
             </div>
             <button type="button" class="person-enter-btn" onclick="openEquipmentProfile(${index})">Ingresar</button>
@@ -5218,6 +5322,8 @@ async function savePerson(index) {
     const dateInput = card.querySelector('.edit-date');
     const date = dateInput ? dateInput.value : '';
     const photoFile = card.querySelector('.edit-photo').files[0];
+    const photoUrlInput = card.querySelector('.edit-photo-url');
+    const photoUrl = photoUrlInput ? photoUrlInput.value.trim() : '';
     if (!name || !dni || (!isTiManager && !date)) {
         alert('Completa el nombre, DNI y fecha de ingreso.');
         return;
@@ -5235,6 +5341,15 @@ async function savePerson(index) {
             return;
         }
         person.foto = await readPersonPhoto(photoFile);
+    } else if (photoUrl) {
+        // Validar URL básica
+        try {
+            const parsed = new URL(photoUrl);
+            person.foto = parsed.href;
+        } catch (err) {
+            alert('La URL de la foto no es válida.');
+            return;
+        }
     }
     try {
         // Guardado local inmediato
