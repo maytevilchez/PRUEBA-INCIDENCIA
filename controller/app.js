@@ -3529,7 +3529,7 @@ function backToAreas() {
 // Personas mostradas en cada area. El numero de tarjetas coincide con el numero del area.
 const AREA_PERSON_COUNTS = {
     Contabilidad: 1, Ingenieria: 6, Logistica: 2, Marketing: 1, Ofertas: 3,
-    Operaciones: 7, Planificacion: 1, SAS: 5, SSOMA: 1, TI: 3
+    Operaciones: 7, Planificacion: 1, SAS: 5, SSOMA: 1, TI: 4
 };
 
 /* Las fotos no se guardan en localStorage porque su límite es muy reducido.
