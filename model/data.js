@@ -82,7 +82,50 @@ window.APP_MODEL = {
     activeInventorySheet: "Principal",
 
     // Datos derivados para el panel Reporte (se generan desde el inventario)
-    reportes: []
+    reportes: [],
+
+    /*
+     * Respaldo editable de fichas de personal.
+     * Duplica este formato para cada área y colaborador. Supabase prevalece
+     * cuando está disponible, por lo que estos datos sirven como base visible
+     * y como respaldo si se abre el sistema sin conexión.
+     */
+    personnelByArea: {
+        TI: [
+            {
+                nombre: 'Edwin Chaparro Ampa',
+                dni: 'Pendiente', // Reemplaza por el DNI real
+                cargo: 'Gerente de TI',
+                fechaIngreso: 'Pendiente',
+                equipmentProfiles: [{
+                    name: 'Laptop', brand: 'Pendiente', model: 'Pendiente', serial: 'Pendiente', status: 'Activo',
+                    hardware: {}, software: {},
+                    accessoryList: [
+                        { name: 'Cargador', model: 'Pendiente', serial: 'Pendiente' },
+                        { name: 'Mouse', model: 'Pendiente', serial: 'Pendiente' }
+                    ]
+                }],
+                incidents: [
+                    { title: 'Sin incidencias registradas', description: '', severity: 'Baja', status: 'Resuelto', created_at: '2026-01-01' }
+                ]
+            },
+            {
+                nombre: 'Thalia Giral Onton', dni: 'Pendiente', cargo: 'Soporte TI', fechaIngreso: 'Pendiente',
+                equipmentProfiles: [{ name: 'Laptop', brand: 'Pendiente', model: 'Pendiente', serial: 'Pendiente', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
+                incidents: []
+            },
+            {
+                nombre: 'Mayte Francesca Vilchez Ramos', dni: 'Pendiente', cargo: 'Soporte TI', fechaIngreso: 'Pendiente',
+                equipmentProfiles: [{ name: 'Laptop', brand: 'Pendiente', model: 'Pendiente', serial: 'Pendiente', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
+                incidents: []
+            },
+            {
+                nombre: 'Zayd Ayasta Martel', dni: 'Pendiente', cargo: 'TI', fechaIngreso: 'Pendiente',
+                equipmentProfiles: [{ name: 'Laptop', brand: 'Pendiente', model: 'Pendiente', serial: 'Pendiente', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
+                incidents: []
+            }
+        ]
+    }
 };
 
 /* -------------------------

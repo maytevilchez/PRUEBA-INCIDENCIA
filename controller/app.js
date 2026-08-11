@@ -3955,6 +3955,27 @@ const AREA_PEOPLE = Object.fromEntries(Object.entries(AREA_PERSONS).map(([area, 
     })];
 }));
 
+// Datos editables en model/data.js. Son el respaldo inicial; al conectarse,
+// los registros de Supabase se aplican después y tienen prioridad.
+function applyModelPersonnelDefaults() {
+    const modelPeople = window.APP_MODEL?.personnelByArea || {};
+    Object.entries(modelPeople).forEach(([area, people]) => {
+        if (!Array.isArray(people) || !people.length || !Array.isArray(AREA_PEOPLE[area])) return;
+        people.forEach((seed, index) => {
+            if (!seed || index >= AREA_PEOPLE[area].length) return;
+            const current = AREA_PEOPLE[area][index];
+            AREA_PEOPLE[area][index] = {
+                ...current,
+                ...seed,
+                foto: seed.foto || current.foto
+            };
+            ensurePersonEmployeeKey(area, index, AREA_PEOPLE[area][index]);
+        });
+    });
+}
+
+applyModelPersonnelDefaults();
+
 function escapePersonText(value) {
     return String(value ?? '').replace(/[&<>'"]/g, character => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
@@ -4720,7 +4741,10 @@ async function showEquipmentIncidents() {
     const employee = profile.querySelector('.equipment-profile-top h2')?.textContent?.trim() || '';
     const person = AREA_PEOPLE[window.selectedArea]?.[window.selectedPersonIndex] || null;
     const remoteEmployeeId = String(person?.supabaseEmployeeId || '').trim();
-    const storedIncidents = readEmployeeIncidents(employee);
+    const storedIncidents = [
+        ...readEmployeeIncidents(employee),
+        ...(Array.isArray(person?.incidents) ? person.incidents : [])
+    ];
     const remoteIncidents = await loadIncidentsFromSupabaseForEmployee(remoteEmployeeId);
     const mergedIncidents = mergeIncidentHistory(storedIncidents, remoteIncidents, employee);
     const safe = escapePersonText;
@@ -5152,8 +5176,12 @@ async function selectArea(areaName) {
 
     const container = document.querySelector('.person-card-container');
     if (container && window.areaPeopleReady) {
-        container.innerHTML = '<p class="person-loading">Cargando información guardada en Supabase...</p>';
+        // Mostrar de inmediato los datos base, sin mensaje de carga.
+        renderAreaPeople(areaName);
         await window.areaPeopleReady;
+        // Cada apertura consulta de nuevo Supabase. Así todas las PCs ven la
+        // versión actual de los colaboradores, equipos y accesorios.
+        await loadAreaPeopleData();
         // El usuario pudo seleccionar otra área mientras se completaba la carga.
         if (window.selectedArea !== areaName) return;
     }
@@ -5368,6 +5396,10 @@ async function loadAreaPeopleData() {
                 person.supabaseEquipmentIds = person.equipmentProfiles.map(profile => profile.supabaseEquipmentId);
             }));
         }
+
+        // Si un área fue definida en model/data.js, sus fichas son la base que
+        // se muestra en pantalla (por ejemplo, el personal de TI).
+        applyModelPersonnelDefaults();
 
         await saveAreaPeopleData();
         if (window.selectedArea) renderAreaPeople(window.selectedArea);
