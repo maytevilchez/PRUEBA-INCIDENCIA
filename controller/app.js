@@ -94,33 +94,44 @@ function login() {
 }
 
 // Permitir login con tecla Enter
-document.addEventListener('DOMContentLoaded', function() {
+function attachLoginKeyHandlers() {
     const usuarioInput = document.getElementById("usuario");
     const passwordInput = document.getElementById("password");
-    
+
     if (usuarioInput) {
-        usuarioInput.addEventListener('keypress', function(event) {
+        usuarioInput.addEventListener('keydown', function(event) {
             if (event.key === 'Enter') {
-                passwordInput.focus();
+                event.preventDefault();
+                if (passwordInput) {
+                    passwordInput.focus();
+                }
             }
         });
     }
-    
+
     if (passwordInput) {
-        passwordInput.addEventListener('keypress', function(event) {
+        passwordInput.addEventListener('keydown', function(event) {
             if (event.key === 'Enter') {
+                event.preventDefault();
                 login();
             }
         });
     }
-    
+
     // Inicializar cualquier tabla o panel
     setTimeout(() => {
-        if (document.getElementById("dashboard").style.display === "block") {
+        const dashboard = document.getElementById("dashboard");
+        if (dashboard && dashboard.style.display === "block") {
             renderInventoryTable();
         }
     }, 100);
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', attachLoginKeyHandlers);
+} else {
+    attachLoginKeyHandlers();
+}
 
 /* ─── SECCIÓN: CHAT EJECUTIVO (index.html → #chat-widget, #chat-open-fab) ───
    openChat / closeChat     → Mostrar u ocultar el asistente
@@ -3263,7 +3274,7 @@ function loadInventoryFromExcel(event) {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = async function(e) {
         try {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, { type: 'array', cellDates: true });
