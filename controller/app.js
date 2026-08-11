@@ -1500,6 +1500,41 @@ async function loadInventoryFromSupabase() {
     return null;
 }
 
+async function loadInventoryFromSupabaseEquipment() {
+    if (!isSupabaseConfigured()) return null;
+    try {
+        const { equipment } = await loadEquipmentDataFromSupabase();
+        if (!Array.isArray(equipment) || !equipment.length) return null;
+
+        const rows = equipment.map(item => ({
+            Empleado: String(item.employee_name || '').trim(),
+            Equipo: String(item.equipment_name || '').trim(),
+            Marca: String(item.brand || '').trim(),
+            'Fecha de devolución': String(item.return_date || '').trim(),
+            'Descripción del problema': String(item.problem_description || item.action_taken || '').trim(),
+            'Acción tomada': String(item.action_taken || '').trim(),
+            'Fecha que se le entregó uno nuevo': String(item.replacement_date || '').trim(),
+            Estado: String(item.status || 'Pendiente').trim()
+        }));
+
+        window.APP_MODEL = window.APP_MODEL || {};
+        window.APP_MODEL.inventoryBySheet = {
+            Principal: {
+                columns: getDefaultInventoryColumns().slice(),
+                rows,
+                fieldMap: defaultInventoryFieldMap()
+            }
+        };
+        window.APP_MODEL.activeInventorySheet = 'Principal';
+        window.APP_MODEL.excelFieldLabels = getDefaultExcelFieldLabels();
+        window.APP_MODEL.hasImportedInventory = true;
+        return true;
+    } catch (error) {
+        console.warn('No se pudo cargar el inventario desde Supabase equipment:', error);
+        return null;
+    }
+}
+
 async function saveInventoryToSupabase() {
     if (!isSupabaseConfigured() || !window.APP_MODEL) return false;
     ensureInventoryBySheetModel();
@@ -1545,6 +1580,12 @@ async function loadInventoryFromStorage() {
         return true;
     }
 
+    const remoteEquipment = await loadInventoryFromSupabaseEquipment();
+    if (remoteEquipment) {
+        saveInventoryToStorage(true);
+        return true;
+    }
+
     const stored = localStorage.getItem('inventoryData');
     if (!stored) {
         ensureInventoryBySheetModel();
@@ -1572,7 +1613,7 @@ async function loadInventoryFromStorage() {
     }
 }
 
-function saveInventoryToStorage() {
+function saveInventoryToStorage(skipRemoteSync = false) {
     if (!window.APP_MODEL) return;
     ensureInventoryBySheetModel();
     try {
@@ -1585,7 +1626,9 @@ function saveInventoryToStorage() {
             excelFieldLabels: window.APP_MODEL.excelFieldLabels || getDefaultExcelFieldLabels(),
             analysisSheetFilter: selectedAnalysisSheet || 'all'
         }));
-        queueInventoryRemoteSync();
+        if (!skipRemoteSync) {
+            queueInventoryRemoteSync();
+        }
     } catch (error) {
         console.warn('Error guardando inventoryData en localStorage', error);
     }
@@ -3246,6 +3289,19 @@ function loadInventoryFromExcel(event) {
             renderAnalysis();
             renderAlerts();
             renderReportes();
+
+            if (isSupabaseConfigured()) {
+                try {
+                    const saved = await saveInventoryToSupabase();
+                    if (saved) {
+                        console.info('Inventario guardado en Supabase.');
+                    } else {
+                        console.warn('No se pudo sincronizar el inventario con Supabase.');
+                    }
+                } catch (error) {
+                    console.warn('Error guardando inventario en Supabase:', error);
+                }
+            }
 
             const sheetSummary = importMeta.sheets.map(s => `${s.name}: ${s.rows}`).join(' · ');
             alert(`Archivo integrado: ${importMeta.totalRows} fila(s) en ${importMeta.sheets.length} hoja(s). Se guardaron todas las columnas tal como vienen en el Excel.\n${sheetSummary}`);
