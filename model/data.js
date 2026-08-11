@@ -91,12 +91,245 @@ window.APP_MODEL = {
      * y como respaldo si se abre el sistema sin conexión.
      */
     personnelByArea: {
+        Contabilidad: Array.from({ length: 1 }).map((_, i) => ({
+            nombre: `Yuli Tarazona Aguirre `,
+            dni: '40186232',
+            cargo: 'Contabilidad',
+            fechaIngreso: '01/09/2022',
+            foto: '',
+            equipmentProfiles: [{ name: 'Laptop', brand: 'Pendiente', model: 'Pendiente', serial: 'Pendiente', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
+            incidents: []
+        })),
+         Ingenieria: [
+            {
+                nombre: 'Jonathan Oswaldo Azaña Ramos',
+                dni: '42560250',
+                cargo: 'Jefe de Logistica',
+                fechaIngreso: '01/05/2018',
+                foto: '',
+                equipmentProfiles: [{ name: 'Laptop', brand: 'Lenovo', model: 'ThinkPad', serial: 'L-LOG-001', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
+                incidents: []
+            },
+            {
+                nombre: 'Carlos Fernando Lozano Roman',
+                dni: '70069180',
+                cargo: 'Logistica',
+                fechaIngreso: '01/03/2024',
+                foto: '',
+                equipmentProfiles: [{ name: 'Laptop', brand: 'HP', model: 'ProBook', serial: 'L-LOG-002', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
+                incidents: []
+            },
+             {
+                nombre: 'Carlos Fernando Lozano Roman',
+                dni: '70069180',
+                cargo: 'Logistica',
+                fechaIngreso: '01/03/2024',
+                foto: '',
+                equipmentProfiles: [{ name: 'Laptop', brand: 'HP', model: 'ProBook', serial: 'L-LOG-002', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
+                incidents: []
+            },
+             {
+                nombre: 'Carlos Fernando Lozano Roman',
+                dni: '70069180',
+                cargo: 'Logistica',
+                fechaIngreso: '01/03/2024',
+                foto: '',
+                equipmentProfiles: [{ name: 'Laptop', brand: 'HP', model: 'ProBook', serial: 'L-LOG-002', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
+                incidents: []
+            },
+             {
+                nombre: 'Carlos Fernando Lozano Roman',
+                dni: '70069180',
+                cargo: 'Logistica',
+                fechaIngreso: '01/03/2024',
+                foto: '',
+                equipmentProfiles: [{ name: 'Laptop', brand: 'HP', model: 'ProBook', serial: 'L-LOG-002', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
+                incidents: []
+            },
+             {
+                nombre: 'Carlos Fernando Lozano Roman',
+                dni: '70069180',
+                cargo: 'Logistica',
+                fechaIngreso: '01/03/2024',
+                foto: '',
+                equipmentProfiles: [{ name: 'Laptop', brand: 'HP', model: 'ProBook', serial: 'L-LOG-002', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
+                incidents: []
+            }
+        ],
+        Logistica: [
+            {
+                nombre: 'Jonathan Oswaldo Azaña Ramos',
+                dni: '42560250',
+                cargo: 'Jefe de Logistica',
+                fechaIngreso: '01/05/2018',
+                foto: '',
+                equipmentProfiles: [{ name: 'Laptop', brand: 'Lenovo', model: 'ThinkPad', serial: 'L-LOG-001', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
+                incidents: []
+            },
+            {
+                nombre: 'Carlos Fernando Lozano Roman',
+                dni: '70069180',
+                cargo: 'Logistica',
+                fechaIngreso: '01/03/2024',
+                foto: '',
+                equipmentProfiles: [{ name: 'Laptop', brand: 'HP', model: 'ProBook', serial: 'L-LOG-002', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
+                incidents: []
+            }
+        ],
+        Marketing: Array.from({ length: 1 }).map((_, i) => ({
+            nombre: `Colaborador ${i + 1}`,
+            dni: 'Pendiente',
+            cargo: 'Marketing',
+            fechaIngreso: 'Pendiente',
+            foto: '',
+            equipmentProfiles: [{ name: 'Laptop', brand: 'Pendiente', model: 'Pendiente', serial: 'Pendiente', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
+            incidents: []
+        })),
+        Ofertas: Array.from({ length: 3 }).map((_, i) => ({
+            nombre: `Colaborador ${i + 1}`,
+            dni: 'Pendiente',
+            cargo: 'Ofertas',
+            fechaIngreso: 'Pendiente',
+            foto: '',
+            equipmentProfiles: [{ name: 'Laptop', brand: 'Pendiente', model: 'Pendiente', serial: 'Pendiente', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
+            incidents: []
+        })),
+        Operaciones: [
+            {
+                nombre: 'Jonathan Oswaldo Azaña Ramos',
+                dni: '42560250',
+                cargo: 'Jefe de Logistica',
+                fechaIngreso: '01/05/2018',
+                foto: '',
+                equipmentProfiles: [{ name: 'Laptop', brand: 'Lenovo', model: 'ThinkPad', serial: 'L-LOG-001', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
+                incidents: []
+            },
+            {
+                nombre: 'Carlos Fernando Lozano Roman',
+                dni: '70069180',
+                cargo: 'Logistica',
+                fechaIngreso: '01/03/2024',
+                foto: '',
+                equipmentProfiles: [{ name: 'Laptop', brand: 'HP', model: 'ProBook', serial: 'L-LOG-002', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
+                incidents: []
+            }
+            {
+                nombre: 'Jonathan Oswaldo Azaña Ramos',
+                dni: '42560250',
+                cargo: 'Jefe de Logistica',
+                fechaIngreso: '01/05/2018',
+                foto: '',
+                equipmentProfiles: [{ name: 'Laptop', brand: 'Lenovo', model: 'ThinkPad', serial: 'L-LOG-001', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
+                incidents: []
+            },
+            {
+                nombre: 'Jonathan Oswaldo Azaña Ramos',
+                dni: '42560250',
+                cargo: 'Jefe de Logistica',
+                fechaIngreso: '01/05/2018',
+                foto: '',
+                equipmentProfiles: [{ name: 'Laptop', brand: 'Lenovo', model: 'ThinkPad', serial: 'L-LOG-001', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
+                incidents: []
+            },
+            {
+                nombre: 'Jonathan Oswaldo Azaña Ramos',
+                dni: '42560250',
+                cargo: 'Jefe de Logistica',
+                fechaIngreso: '01/05/2018',
+                foto: '',
+                equipmentProfiles: [{ name: 'Laptop', brand: 'Lenovo', model: 'ThinkPad', serial: 'L-LOG-001', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
+                incidents: []
+            },
+            {
+                nombre: 'Jonathan Oswaldo Azaña Ramos',
+                dni: '42560250',
+                cargo: 'Jefe de Logistica',
+                fechaIngreso: '01/05/2018',
+                foto: '',
+                equipmentProfiles: [{ name: 'Laptop', brand: 'Lenovo', model: 'ThinkPad', serial: 'L-LOG-001', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
+                incidents: []
+            },
+            {
+                nombre: 'Jonathan Oswaldo Azaña Ramos',
+                dni: '42560250',
+                cargo: 'Jefe de Logistica',
+                fechaIngreso: '01/05/2018',
+                foto: '',
+                equipmentProfiles: [{ name: 'Laptop', brand: 'Lenovo', model: 'ThinkPad', serial: 'L-LOG-001', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
+                incidents: []
+            },
+        ],
+        Planificacion: Array.from({ length: 1 }).map((_, i) => ({
+            nombre: `Colaborador ${i + 1}`,
+            dni: 'Pendiente',
+            cargo: 'Planificacion',
+            fechaIngreso: 'Pendiente',
+            foto: '',
+            equipmentProfiles: [{ name: 'Laptop', brand: 'Pendiente', model: 'Pendiente', serial: 'Pendiente', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
+            incidents: []
+        })),
+        SAS: [
+            {
+                nombre: 'Jonathan Oswaldo Azaña Ramos',
+                dni: '42560250',
+                cargo: 'Jefe de Logistica',
+                fechaIngreso: '01/05/2018',
+                foto: '',
+                equipmentProfiles: [{ name: 'Laptop', brand: 'Lenovo', model: 'ThinkPad', serial: 'L-LOG-001', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
+                incidents: []
+            },
+            {
+                nombre: 'Carlos Fernando Lozano Roman',
+                dni: '70069180',
+                cargo: 'Logistica',
+                fechaIngreso: '01/03/2024',
+                foto: '',
+                equipmentProfiles: [{ name: 'Laptop', brand: 'HP', model: 'ProBook', serial: 'L-LOG-002', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
+                incidents: []
+            },
+             {
+                nombre: 'Carlos Fernando Lozano Roman',
+                dni: '70069180',
+                cargo: 'Logistica',
+                fechaIngreso: '01/03/2024',
+                foto: '',
+                equipmentProfiles: [{ name: 'Laptop', brand: 'HP', model: 'ProBook', serial: 'L-LOG-002', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
+                incidents: []
+            },
+             {
+                nombre: 'Carlos Fernando Lozano Roman',
+                dni: '70069180',
+                cargo: 'Logistica',
+                fechaIngreso: '01/03/2024',
+                foto: '',
+                equipmentProfiles: [{ name: 'Laptop', brand: 'HP', model: 'ProBook', serial: 'L-LOG-002', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
+                incidents: []
+            },
+             {
+                nombre: 'Carlos Fernando Lozano Roman',
+                dni: '70069180',
+                cargo: 'Logistica',
+                fechaIngreso: '01/03/2024',
+                foto: '',
+                equipmentProfiles: [{ name: 'Laptop', brand: 'HP', model: 'ProBook', serial: 'L-LOG-002', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
+                incidents: []
+            },
+        ],
+        SSOMA: Array.from({ length: 1 }).map((_, i) => ({
+            nombre: `Colaborador ${i + 1}`,
+            dni: 'Pendiente',
+            cargo: 'SSOMA',
+            fechaIngreso: 'Pendiente',
+            foto: '',
+            equipmentProfiles: [{ name: 'Laptop', brand: 'Pendiente', model: 'Pendiente', serial: 'Pendiente', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
+            incidents: []
+        })),
         TI: [
             {
                 nombre: 'Edwin Chaparro Ampa',
-                dni: 'Pendiente', // Reemplaza por el DNI real
+                dni: 'Pendiente',
                 cargo: 'Gerente de TI',
-                fechaIngreso: 'Pendiente',
+                foto: '',
                 equipmentProfiles: [{
                     name: 'Laptop', brand: 'Pendiente', model: 'Pendiente', serial: 'Pendiente', status: 'Activo',
                     hardware: {}, software: {},
@@ -110,17 +343,17 @@ window.APP_MODEL = {
                 ]
             },
             {
-                nombre: 'Thalia Giral Onton', dni: 'Pendiente', cargo: 'Soporte TI', fechaIngreso: 'Pendiente',
+                nombre: 'Thalia Giral Onton', dni: 'Pendiente', cargo: 'Soporte TI', fechaIngreso: 'Pendiente', foto: '',
                 equipmentProfiles: [{ name: 'Laptop', brand: 'Pendiente', model: 'Pendiente', serial: 'Pendiente', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
                 incidents: []
             },
             {
-                nombre: 'Mayte Francesca Vilchez Ramos', dni: 'Pendiente', cargo: 'Soporte TI', fechaIngreso: 'Pendiente',
+                nombre: 'Mayte Francesca Vilchez Ramos', dni: 'Pendiente', cargo: 'Soporte TI', fechaIngreso: 'Pendiente', foto: '',
                 equipmentProfiles: [{ name: 'Laptop', brand: 'Pendiente', model: 'Pendiente', serial: 'Pendiente', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
                 incidents: []
             },
             {
-                nombre: 'Zayd Ayasta Martel', dni: 'Pendiente', cargo: 'TI', fechaIngreso: 'Pendiente',
+                nombre: 'Zayd Ayasta Martel', dni: '60947270', cargo: 'TI', fechaIngreso: '11/08/2026', foto: '<img src="https://img.sanishtech.com/u/955906c3515f2d7ab7a45cdce7a039e9.jpeg" alt="WhatsApp Image 2026-08-10 at 10.18.11 (1)" width="1193" height="1166" loading="lazy" style="max-width:100%;height:auto;">',
                 equipmentProfiles: [{ name: 'Laptop', brand: 'Pendiente', model: 'Pendiente', serial: 'Pendiente', status: 'Activo', hardware: {}, software: {}, accessoryList: [] }],
                 incidents: []
             }
