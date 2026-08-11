@@ -1490,6 +1490,7 @@ function applyInventorySnapshot(parsed) {
 async function loadInventoryFromSupabase() {
     if (!isSupabaseConfigured()) return null;
     try {
+        // Debe coincidir con el tipo utilizado al guardar el snapshot.
         const response = await supabaseRestFetch('reports?select=id,report_type,summary,payload,created_at&report_type=eq.inventory&order=created_at.desc&limit=1', {
             method: 'GET'
         });
@@ -3738,13 +3739,32 @@ async function saveEmployeeProfileToSupabase(areaName, index) {
     if (isLocalFileProtocol()) {
         throw new Error('No se puede conectar a Supabase desde file://. Abre la app desde un servidor local (por ejemplo Live Server o http://localhost).');
     }
-    const response = await supabaseRestFetch('employee_profiles?on_conflict=employee_key', {
-        method: 'POST',
+    // employee_id también es único. Al editar desde otra PC puede existir una
+    // copia local con una employee_key anterior, así que se actualiza primero
+    // por el identificador estable del empleado.
+    let response = await supabaseRestFetch(`employee_profiles?employee_id=eq.${encodeURIComponent(record.employee_id)}`, {
+        method: 'PATCH',
         headers: {
-            Prefer: 'resolution=merge-duplicates'
+            Prefer: 'return=representation'
         },
-        body: JSON.stringify([record])
+        body: JSON.stringify(record)
     });
+    if (response.ok) {
+        const updatedRows = await response.json();
+        if (Array.isArray(updatedRows) && updatedRows.length > 0) {
+            return true;
+        }
+    }
+    if (response.ok) {
+        // No había perfil para este empleado: créalo y resuelve por employee_key.
+        response = await supabaseRestFetch('employee_profiles?on_conflict=employee_key', {
+            method: 'POST',
+            headers: {
+                Prefer: 'resolution=merge-duplicates'
+            },
+            body: JSON.stringify([record])
+        });
+    }
     if (!response.ok) {
         const errorText = await response.text();
         const message = `No se pudo sincronizar con Supabase: ${response.status} ${response.statusText} ${errorText}`;
@@ -3814,7 +3834,7 @@ async function loadEmployeeDataFromSupabase() {
 async function loadEquipmentDataFromSupabase() {
     if (!isSupabaseConfigured()) return { equipment: [], accessories: [] };
     const [equipmentResponse, accessoriesResponse] = await Promise.all([
-        supabaseRestFetch('equipment?select=id,employee_id,employee_name,area_name,equipment_name,brand,model,serial,hardware,software,accessories,action_taken,status', { method: 'GET' }),
+        supabaseRestFetch('equipment?select=id,employee_id,employee_name,area_name,equipment_name,brand,model,serial,hardware,software,accessories,problem_description,action_taken,return_date,replacement_date,status', { method: 'GET' }),
         supabaseRestFetch('equipment_accessories?select=id,equipment_id,employee_id,name,model,serial', { method: 'GET' })
     ]);
     if (!equipmentResponse.ok) throw new Error(`No se pudieron cargar los equipos desde Supabase: ${equipmentResponse.status}`);
