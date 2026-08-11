@@ -1,7 +1,13 @@
 {
+  "name": "nakama-reportes",
+  "version": "1.0.0",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
   "dependencies": {
-    "@supabase/supabase-js": "^2.112.0",
-    "pg": "^8.11.0"
+    "@supabase/supabase-js": "^2.112.0"
   },
   "devDependencies": {
     "netlify-cli": "^27.1.0"
