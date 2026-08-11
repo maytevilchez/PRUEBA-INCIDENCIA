@@ -5141,7 +5141,7 @@ function enablePhotoDragging() {
     return;
 }
 
-function selectArea(areaName) {
+async function selectArea(areaName) {
     closeEquipmentProfile();
     window.selectedArea = areaName;
     document.querySelector('.areas-grid-container').style.display = 'none';
@@ -5149,6 +5149,14 @@ function selectArea(areaName) {
     detailsContainer.classList.remove('area-details-hidden');
     detailsContainer.classList.add('area-details-container');
     document.getElementById('area-selected-title').textContent = `Area: ${areaName}`;
+
+    const container = document.querySelector('.person-card-container');
+    if (container && window.areaPeopleReady) {
+        container.innerHTML = '<p class="person-loading">Cargando información guardada en Supabase...</p>';
+        await window.areaPeopleReady;
+        // El usuario pudo seleccionar otra área mientras se completaba la carga.
+        if (window.selectedArea !== areaName) return;
+    }
     renderAreaPeople(areaName);
     updateSupabaseStatusIndicator();
 }
@@ -5352,7 +5360,9 @@ async function loadAreaPeopleData() {
     }
 }
 
-loadAreaPeopleData();
+// Una única carga remota compartida por todas las áreas. Las tarjetas esperan
+// esta promesa para no mostrar los valores de ejemplo antes de Supabase.
+window.areaPeopleReady = loadAreaPeopleData();
 Object.values(AREA_PEOPLE).forEach(people => people.forEach(person => delete person.correo));
 
 window.addEventListener('beforeunload', event => {
